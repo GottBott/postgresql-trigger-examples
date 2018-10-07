@@ -1,7 +1,20 @@
-CREATE DATABASE nabat;
-GRANT ALL PRIVILEGES ON DATABASE nabat TO postgres;
 
-CREATE SCHEMA nabat;
+DROP TRIGGER if exists bulk_insert ON nabat.bulk;
+drop table if exists nabat.bulk;
+DROP FUNCTION bulk_insert_row();
+   
+drop table nabat.value;
+drop table nabat.event;
+drop table nabat.survey;
+drop table nabat.bat;
+
+
+CREATE TABLE nabat.bat (
+    id SERIAL PRIMARY KEY,
+    name TEXT,
+    sppcode TEXT
+);
+
 
 CREATE TABLE nabat.survey (
     id SERIAL PRIMARY KEY,
@@ -33,8 +46,17 @@ CREATE TABLE nabat.value (
     description TEXT,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    event_id INTEGER NOT NULL REFERENCES nabat.event(id)
+    event_id INTEGER NOT NULL REFERENCES nabat.event(id),
+    bat_id INTEGER NOT NULL REFERENCES nabat.bat(id)
+
 );
+
+
+INSERT INTO nabat.bat (name, sppcode) VALUES
+('Big Brown Bat', 'BBB'),
+('Small Red Bat', 'SRB'),
+('Fuzzy Little Guy', 'FLG'),
+('Killer Vampire Bat', 'KVB');
 
 
 INSERT INTO nabat.survey (name, description) VALUES
@@ -51,22 +73,14 @@ INSERT INTO nabat.event (name, description, survey_id) VALUES
 ('i', 'Child description 3', 3);
 
 
-INSERT INTO nabat.value (name, description, event_id) VALUES
-('j', 'Child description 1', 1),
-('k', 'Child description 2', 1),
-('l', 'Child description 3', 2),
-('m', 'Child description 1', 2),
-('n', 'Child description 2', 3),
-('o', 'Child description 3', 3),
-('p', 'Child description 1', 4),
-('q', 'Child description 2', 4),
-('r', 'Child description 3', 5),
-('s', 'Child description 3', 5),
-('t', 'Child description 3', 6),
-('u', 'Child description 3', 6);
+INSERT INTO nabat.value (name, description, event_id,bat_id) VALUES
+('j', 'Child description 1', 1,1),
+('k', 'Child description 2', 1,1),
+('l', 'Child description 3', 2,1),
+('m', 'Child description 1', 2,1),
+('n', 'Child description 2', 3,1);
 
 
-drop table if exists nabat.bulk;
 CREATE TABLE nabat.bulk (
     id SERIAL PRIMARY KEY,
     survey_name TEXT,
@@ -75,14 +89,12 @@ CREATE TABLE nabat.bulk (
     event_description TEXT,
     value_name TEXT,
     value_description TEXT,
+    value_bat_sppcode TEXT,
     created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 
-DROP TRIGGER if exists bulk_insert ON nabat.bulk;
-DROP FUNCTION bulk_insert_row();
-   
 CREATE OR REPLACE FUNCTION bulk_insert_row ()
 RETURNS trigger AS $trigger$
 declare
@@ -109,9 +121,11 @@ END IF;
    SELECT id into valueId FROM nabat.value where name =new.value_name and event_id = eventId;
   IF valueId > 0 THEN
     PERFORM 1;
-ELSE
-    insert into nabat.value (name,description,event_id) values (new.value_name,new.value_description,eventId);
-    SELECT id into valueId FROM nabat.value where name =new.value_name and event_id = eventId;
+else
+	--with bat as (select new.value_name,new.value_description,eventId, id from nabat.bat where sppcode = new.value_bat_sppcode)
+    insert into nabat.value (name,description,event_id,bat_id) values 
+    (new.value_name,new.value_description,eventId,(select id from nabat.bat where sppcode = new.value_bat_sppcode));
+    --SELECT id into valueId FROM nabat.value where name =new.value_name and event_id = eventId;
 END IF;
 
    RETURN NEW;
@@ -125,5 +139,5 @@ CREATE TRIGGER bulk_insert
     EXECUTE PROCEDURE bulk_insert_row();
 
 insert into nabat.bulk ( survey_name,survey_description,event_name,
-event_description,value_name,value_description ) values
-('new survey 1','testing this','new event 2','testing this 1','new value 2','testing this 2');
+event_description,value_name,value_description,value_bat_sppcode ) values
+('new survey 1','a survey','new event 1','an event','new value 1','a value','KVB');
