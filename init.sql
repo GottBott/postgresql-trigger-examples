@@ -119,11 +119,11 @@ CREATE INDEX bulk_sae_transaction_idx ON nabat.bulk_sae (transaction_uuid);
 
 -- view to help see summary info at transaction level
 create or replace view nabat.grouped_bulk_sae_view as
-	select transaction_uuid,
-		sum(case when error then 1 else 0 end) as failed, 
-		sum(case when error then 0 else 1 end) as passed
-	from  nabat.bulk_sae
-	group by transaction_uuid;
+	select sae.transaction_uuid, ut.user_email,
+		sum(case when sae.error then 1 else 0 end) as failed, 
+		sum(case when sae.error then 0 else 1 end) as passed
+	from  nabat.bulk_sae as sae join nabat.user_bulk_transaction as ut on sae.transaction_uuid = ut.transaction_uuid
+	group by sae.transaction_uuid, ut.user_email;
 
 
 -- function to break apart the csv row
@@ -204,7 +204,7 @@ event_description,value_name,value_description,value_bat_sppcode ) values
 -- SECOND TRANACTION    
 
 insert into nabat.user_bulk_transaction (user_email, transaction_uuid) values
-('a_different_email@email.com', '123e4567-e89b-12d3-a456-426655440000');
+('email@email.com', '123e4567-e89b-12d3-a456-426655440000');
 
 -- a good insert case
 insert into nabat.bulk_sae ( transaction_uuid,survey_name,survey_description,event_name,
