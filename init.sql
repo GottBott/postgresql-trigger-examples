@@ -83,6 +83,7 @@ INSERT INTO nabat.value (name, description, event_id,bat_id) VALUES
 
 CREATE TABLE nabat.bulk (
     id SERIAL PRIMARY KEY,
+    transaction_uuid UUID,
     survey_name TEXT,
     survey_description TEXT,
     event_name TEXT,
@@ -90,9 +91,12 @@ CREATE TABLE nabat.bulk (
     value_name TEXT,
     value_description TEXT,
     value_bat_sppcode TEXT,
-    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    error  BOOLEAN DEFAULT false,
+    error_text TEXT
 );
+
+CREATE INDEX transaction_idx ON nabat.bulk (transaction_uuid);
+
 
 
 CREATE OR REPLACE FUNCTION bulk_insert_row ()
@@ -122,12 +126,12 @@ END IF;
   IF valueId > 0 THEN
     PERFORM 1;
 else
-	--with bat as (select new.value_name,new.value_description,eventId, id from nabat.bat where sppcode = new.value_bat_sppcode)
     insert into nabat.value (name,description,event_id,bat_id) values 
     (new.value_name,new.value_description,eventId,(select id from nabat.bat where sppcode = new.value_bat_sppcode));
-    --SELECT id into valueId FROM nabat.value where name =new.value_name and event_id = eventId;
 END IF;
-
+  RETURN NEW;
+EXCEPTION WHEN OTHERS then
+UPDATE nabat.bulk SET error = true, error_text = 'Error =' || SQLERRM || SQLSTATE WHERE id = new.id;
    RETURN NEW;
 END;
 $trigger$ LANGUAGE plpgsql;
@@ -138,6 +142,12 @@ CREATE TRIGGER bulk_insert
     FOR EACH ROW
     EXECUTE PROCEDURE bulk_insert_row();
 
-insert into nabat.bulk ( survey_name,survey_description,event_name,
+-- a good insert case
+insert into nabat.bulk ( transaction_uuid,survey_name,survey_description,event_name,
 event_description,value_name,value_description,value_bat_sppcode ) values
-('new survey 1','a survey','new event 1','an event','new value 1','a value','KVB');
+('0e37df36-f698-11e6-8dd4-cb9ced3df976','new survey 1','a survey','new event 1','an event','new value 1','a value','KVB');
+
+-- insert with invalid spp code
+insert into nabat.bulk ( transaction_uuid,survey_name,survey_description,event_name,
+event_description,value_name,value_description,value_bat_sppcode ) values
+('0e37df36-f698-11e6-8dd4-cb9ced3df976','new survey 1','a survey','new event 1','an event','new value 2','a value','XXXsa');
