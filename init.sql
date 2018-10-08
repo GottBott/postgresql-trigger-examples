@@ -85,13 +85,25 @@ INSERT INTO nabat.bat (name, sppcode) VALUES
 --('n', 'Child description 2', 3,1);
 
 
+-- after generating the uuid the front end should store it
+--  so it can come back to user transaction at a later date
+create table nabat.user_bulk_transaction(
+ id SERIAL PRIMARY KEY,
+ user_email varchar(255),
+ transaction_uuid UUID unique,
+ created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX user_bulk_transaction_email_idx ON nabat.user_bulk_transaction (user_email);
+
+
 -- table has same datatypes as csv 
 -- using actual values not forign key ids
 -- aka no refrence value checking on front end 
 -- except for validation 
 CREATE TABLE nabat.bulk_sae (
     id SERIAL PRIMARY KEY,
-    transaction_uuid UUID,
+    transaction_uuid UUID NOT NULL REFERENCES nabat.user_bulk_transaction(transaction_uuid),
     survey_name TEXT,
     survey_description TEXT,
     event_name TEXT,
@@ -113,17 +125,6 @@ create or replace view nabat.grouped_bulk_sae_view as
 	from  nabat.bulk_sae
 	group by transaction_uuid;
 
-
--- after generating the uuid the front end should store it
---  so it can come back to user transaction at a later date
-create table nabat.user_bulk_transaction(
- id SERIAL PRIMARY KEY,
- user_email varchar(255),
- transaction_uuid UUID,
- created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX user_bulk_transaction_email_idx ON nabat.user_bulk_transaction (user_email);
 
 -- function to break apart the csv row
 -- and normilize it into tables
@@ -177,7 +178,10 @@ CREATE TRIGGER bulk_insert_sae
    
    
 -- FIRST TRANACTION    
-   
+
+insert into nabat.user_bulk_transaction (user_email, transaction_uuid) values
+('email@email.com', '0e37df36-f698-11e6-8dd4-cb9ced3df976');
+
 -- a good insert case
 insert into nabat.bulk_sae ( transaction_uuid,survey_name,survey_description,event_name,
 event_description,value_name,value_description,value_bat_sppcode ) values
@@ -198,6 +202,9 @@ event_description,value_name,value_description,value_bat_sppcode ) values
 
 
 -- SECOND TRANACTION    
+
+insert into nabat.user_bulk_transaction (user_email, transaction_uuid) values
+('a_different_email@email.com', '123e4567-e89b-12d3-a456-426655440000');
 
 -- a good insert case
 insert into nabat.bulk_sae ( transaction_uuid,survey_name,survey_description,event_name,
